@@ -1,0 +1,78 @@
+name: Remove IP from Allow List
+
+on:
+  workflow_dispatch:
+    inputs:
+      ip_address:
+        description: 'IP address to remove (e.g., 192.168.1.1 or 192.168.1.0/24)'
+        required: true
+        type: string
+      organization:
+        description: 'Organization login'
+        required: false
+        type: string
+        default: 'octodemo'
+
+jobs:
+  remove-ip:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Get IP Allow List Entry ID
+        id: get-entry-id
+        env:
+          GH_TOKEN: ${{ secrets.MY_PAT }}
+        run: |
+          # Note: This query retrieves the first 100 entries.
+          # If your organization has more entries, consider pagination.
+          ENTRY_ID=$(gh api graphql -f query='
+            query {
+              organization(login: "${{ inputs.organization }}") {
+                ipAllowListEntries(first: 100) {
+                  nodes {
+                    id
+                    allowListValue
+                  }
+                }
+              }
+            }
+          ' --jq '.data.organization.ipAllowListEntries.nodes[] | select(.allowListValue == "${{ inputs.ip_address }}") | .id')
+
+          if [ -z "$ENTRY_ID" ]; then
+            echo "Error: IP address ${{ inputs.ip_address }} not found in allow list"
+            exit 1
+          fi
+
+          echo "entry_id=$ENTRY_ID" >> $GITHUB_OUTPUT
+          echo "Found entry ID: $ENTRY_ID"
+
+      - name: Remove IP from Allow List
+        env:
+          GH_TOKEN: ${{ secrets.MY_PAT }}
+        run: |
+          RESPONSE=$(gh api graphql -f query='
+            mutation {
+              deleteIpAllowListEntry(
+                input: {
+                  ipAllowListEntryId: "${{ steps.get-entry-id.outputs.entry_id }}"
+                }
+              ) {
+                clientMutationId
+              }
+            }
+          ' --jq '.data.deleteIpAllowListEntry')
+
+          if [ -z "$RESPONSE" ] || [ "$RESPONSE" = "null" ]; then
+            echo "Error: Failed to remove IP address from allow list"
+            exit 1
+          fi
+
+          echo "Successfully deleted IP entry"
+
+      - name: Summary
+        run: |
+          echo "✅ Successfully removed IP address from allow list" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Organization:** ${{ inputs.organization }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **IP Address:** ${{ inputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
