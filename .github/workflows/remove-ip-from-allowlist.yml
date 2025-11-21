@@ -16,6 +16,8 @@ on:
 jobs:
   remove-ip:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Get IP Allow List Entry ID
         id: get-entry-id
