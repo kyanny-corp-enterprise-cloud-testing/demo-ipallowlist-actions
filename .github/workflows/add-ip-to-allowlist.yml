@@ -26,7 +26,7 @@ jobs:
       - name: Get Organization ID
         id: get-org-id
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.MY_PAT }}
         run: |
           ORG_ID=$(gh api graphql -f query='
             query {
@@ -40,7 +40,7 @@ jobs:
 
       - name: Add IP to Allow List
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.MY_PAT }}
         run: |
           RESPONSE=$(gh api graphql -f query='
             mutation {
