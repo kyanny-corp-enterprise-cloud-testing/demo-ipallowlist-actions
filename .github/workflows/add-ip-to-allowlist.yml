@@ -1,0 +1,70 @@
+name: Add IP to Allow List
+
+on:
+  workflow_dispatch:
+    inputs:
+      ip_address:
+        description: 'IP address to add (e.g., 192.168.1.1 or 192.168.1.0/24)'
+        required: true
+        type: string
+      description:
+        description: 'Description for the IP address entry'
+        required: true
+        type: string
+      organization:
+        description: 'Organization login'
+        required: false
+        type: string
+        default: 'octodemo'
+
+jobs:
+  add-ip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Organization ID
+        id: get-org-id
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ORG_ID=$(gh api graphql -f query='
+            query {
+              organization(login: "${{ inputs.organization }}") {
+                id
+              }
+            }
+          ' --jq '.data.organization.id')
+          echo "org_id=$ORG_ID" >> $GITHUB_OUTPUT
+          echo "Organization ID: $ORG_ID"
+
+      - name: Add IP to Allow List
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api graphql -f query='
+            mutation {
+              createIpAllowListEntry(
+                input: {
+                  ownerId: "${{ steps.get-org-id.outputs.org_id }}"
+                  name: "${{ inputs.description }}"
+                  allowListValue: "${{ inputs.ip_address }}"
+                  isActive: true
+                }
+              ) {
+                ipAllowListEntry {
+                  id
+                  name
+                  allowListValue
+                  createdAt
+                  isActive
+                }
+              }
+            }
+          ' --jq '.data.createIpAllowListEntry.ipAllowListEntry'
+
+      - name: Summary
+        run: |
+          echo "✅ Successfully added IP address to allow list" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Organization:** ${{ inputs.organization }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **IP Address:** ${{ inputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Description:** ${{ inputs.description }}" >> $GITHUB_STEP_SUMMARY
