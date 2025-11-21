@@ -22,6 +22,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Note: This query retrieves the first 100 entries.
+          # If your organization has more entries, consider pagination.
           ENTRY_ID=$(gh api graphql -f query='
             query {
               organization(login: "${{ inputs.organization }}") {
@@ -47,7 +49,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh api graphql -f query='
+          RESPONSE=$(gh api graphql -f query='
             mutation {
               deleteIpAllowListEntry(
                 input: {
@@ -57,7 +59,14 @@ jobs:
                 clientMutationId
               }
             }
-          '
+          ' --jq '.data.deleteIpAllowListEntry')
+
+          if [ -z "$RESPONSE" ] || [ "$RESPONSE" = "null" ]; then
+            echo "Error: Failed to remove IP address from allow list"
+            exit 1
+          fi
+
+          echo "Successfully deleted IP entry"
 
       - name: Summary
         run: |

@@ -40,7 +40,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh api graphql -f query='
+          RESPONSE=$(gh api graphql -f query='
             mutation {
               createIpAllowListEntry(
                 input: {
@@ -59,7 +59,14 @@ jobs:
                 }
               }
             }
-          ' --jq '.data.createIpAllowListEntry.ipAllowListEntry'
+          ' --jq '.data.createIpAllowListEntry.ipAllowListEntry')
+
+          if [ -z "$RESPONSE" ] || [ "$RESPONSE" = "null" ]; then
+            echo "Error: Failed to add IP address to allow list"
+            exit 1
+          fi
+
+          echo "Response: $RESPONSE"
 
       - name: Summary
         run: |
